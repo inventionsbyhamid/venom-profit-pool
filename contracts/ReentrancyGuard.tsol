@@ -1,0 +1,27 @@
+/// We recommend using the compiler version 0.58.1.
+/// You can use other versions, but we do not guarantee compatibility of the compiler version.
+pragma ton-solidity >=0.58.1;
+
+pragma AbiHeader expire;
+pragma AbiHeader time;
+pragma AbiHeader pubkey;
+
+contract ReentrancyGuard {
+  bool private _notEntered;
+
+  constructor() public {
+    // Stating that we have entered the contract, but not yet left
+    _notEntered = true;
+  }
+
+  // Modifier to use on susceptible functions
+  modifier nonReentrant() {
+    // Check if we have already entered the contract
+    require(_notEntered, 101);
+    // We are entering the contract, so set the flag to false
+    _notEntered = false;
+    _;
+    // We have left the contract, so set the flag back to true
+    _notEntered = true;
+  }
+}

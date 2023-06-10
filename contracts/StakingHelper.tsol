@@ -1,0 +1,40 @@
+pragma ton-solidity >=0.58.1;
+
+pragma AbiHeader expire;
+pragma AbiHeader time;
+pragma AbiHeader pubkey;
+import "./ProfitPool.tsol";
+
+contract StakingHelper {
+  address _poolAddress;
+  uint128 _totalStaked;
+
+  modifier onlyPool() {
+    require(msg.sender == _poolAddress, 102);
+    _;
+  }
+
+  uint static _nonce;
+
+  constructor(address poolAddress) public {
+    tvm.accept();
+    _poolAddress = poolAddress;
+  }
+
+  // calculate if we can unstake or not based on strategy timings
+  function canUnstake() external returns (bool) {
+    return true;
+  }
+
+  function stake() external onlyPool {
+    _totalStaked += msg.value;
+  }
+
+  function unstake() external onlyPool {
+    require(address(this).balance > 0, 103);
+    tvm.accept();
+    uint256 amountUnstaked = address(this).balance - 0.006374 ton;
+    ProfitPool(_poolAddress).handleUnstakeCallBack{ value: uint128(amountUnstaked), bounce: false }();
+    _totalStaked = 0;
+  }
+}

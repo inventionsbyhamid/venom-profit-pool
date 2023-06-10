@@ -1,0 +1,107 @@
+pragma ton-solidity >=0.58.1;
+
+pragma AbiHeader expire;
+pragma AbiHeader time;
+pragma AbiHeader pubkey;
+
+import "@itgold/everscale-tip/contracts/access/OwnableExternal.sol";
+import "./ReentrancyGuard.tsol";
+import "./StakingHelper.tsol";
+
+contract ProfitPool is OwnableExternal, ReentrancyGuard {
+  uint256 constant DEPOSIT_AMOUNT = 1 ton;
+  uint256 constant DEPOSIT_TX_FEE = 0.01 ton;
+  uint256 constant MAX_DEPOSITORS = 1000;
+
+  uint256 public stagingVenom;
+  uint256 public finalVenom;
+
+  address[] public stagingDeposits;
+  address[] public finalDeposits;
+
+  address public lastLuckyDepositor;
+  uint256 public lastLuckyAmount;
+  StakingHelper stakingHelper;
+  uint static _nonce;
+  bool _unstaking;
+
+  constructor(uint256 ownerPubkey) public OwnableExternal(ownerPubkey) {
+    tvm.accept();
+  }
+
+  function setStakingHelper(address addr) external onlyOwner {
+    require(addr != address(0), 100);
+    require(stakingHelper == address(0), 101);
+    tvm.accept();
+    stakingHelper = StakingHelper(addr);
+  }
+
+  function revokeOwnership() external onlyOwner {
+    tvm.accept();
+    transferOwnership(0xf);
+  }
+
+  function deposit() public nonReentrant {
+    require(msg.value >= DEPOSIT_AMOUNT + DEPOSIT_TX_FEE, 100);
+    require(msg.sender != address(0), 101);
+    require(stagingDeposits.length < MAX_DEPOSITORS, 102);
+    tvm.accept();
+    stagingDeposits.push(msg.sender);
+    stagingVenom += DEPOSIT_AMOUNT;
+  }
+
+  function initiateStake() public nonReentrant {
+    require(stagingDeposits.length > 0, 100);
+
+    tvm.accept();
+    for (uint i = 0; i < stagingDeposits.length; i++) {
+      finalDeposits.push(stagingDeposits[i]);
+    }
+    // it deletes all elements from the array not just reference
+    delete stagingDeposits;
+    require(finalDeposits.length > 0, 101);
+    require(stagingDeposits.length == 0, 102);
+    stakingHelper.stake{ value: uint128(stagingVenom) }();
+    stagingVenom = 0;
+  }
+
+  // It's an ANTI-PATTERN to loop and send in one transaction
+  function initiateUnStake() public nonReentrant {
+    require(_unstaking == false, 100);
+    tvm.accept();
+    _unstaking = true;
+    uint256 callbackFunctionId = tvm.functionId(handleUnstakeCallBack);
+    stakingHelper.unstake();
+  }
+
+  // SLIGHTLY HACKY WAY TO HANDLE MSG.VALUE FROM StakingHelper
+  function handleUnstakeCallBack() public {
+    require(_unstaking == true, 100);
+    tvm.accept();
+    uint256 amountUnstaked = msg.value;
+    uint256 amountPerDepositor = amountUnstaked / finalDeposits.length;
+    require(msg.value > 0, 99);
+    for (uint i = 0; i < finalDeposits.length; i++) {
+      if (amountUnstaked > DEPOSIT_AMOUNT * finalDeposits.length) {
+        finalDeposits[i].transfer(uint128(DEPOSIT_AMOUNT), false, 2 + 1);
+      } else if (uint128(amountPerDepositor) > 0) {
+        finalDeposits[i].transfer(uint128(amountPerDepositor), false, 2 + 1);
+      }
+    }
+
+    if (amountUnstaked > DEPOSIT_AMOUNT * finalDeposits.length) {
+      uint256 yield = amountUnstaked - DEPOSIT_AMOUNT * finalDeposits.length;
+      uint luckyIndex = 0;
+      lastLuckyDepositor = finalDeposits[luckyIndex];
+      lastLuckyAmount = yield;
+      finalDeposits[luckyIndex].transfer(uint128(yield), false, 2 + 1);
+    } else {
+      lastLuckyDepositor = address(0);
+      lastLuckyAmount = 0;
+    }
+    // it deletes all elements from the array not just reference
+    delete finalDeposits;
+    require(finalDeposits.length == 0, 101);
+    _unstaking = false;
+  }
+}

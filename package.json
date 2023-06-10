@@ -1,0 +1,36 @@
+{
+  "name": "profit-pool-venom-contracts",
+  "license": "Apache-2.0",
+  "author": {
+    "name": "M",
+    "email": "M",
+    "url": "M"
+  },
+  "keywords": [
+    ""
+  ],
+  "scripts": {
+    "build": "npx locklift build",
+    "run:local-node": "docker run --rm -d --name local-node -e USER_AGREEMENT=yes -p 80:80 tonlabs/local-node",
+    "stop:local-node": "docker stop local-node",
+    "test:local": "npx locklift test --network local",
+    "test:dev": "npx locklift test --network dev",
+    "deploy:dev": "npx locklift run --network dev --script scripts/00-deploy-sample.ts",
+    "cleanup": "docker stop local-node && docker rm local-node"
+  },
+  "devDependencies": {
+    "@types/chai": "^4.3.4",
+    "@types/mocha": "^10.0.1",
+    "@types/node": "^18.16.0",
+    "chai": "^4.3.7",
+    "everscale-standalone-client": "^2.1.18",
+    "locklift": "^2.5.2",
+    "prettier": "^2.8.8",
+    "ts-mocha": "^10.0.0",
+    "typescript": "^4.7.4"
+  },
+  "dependencies": {
+    "@itgold/everscale-tip": "^1.1.4",
+    "dotenv": "^16.1.4"
+  }
+}
